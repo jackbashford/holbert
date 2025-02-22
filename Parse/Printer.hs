@@ -1,3 +1,3 @@
-module Printer where
+module Parse.Printer where
 
 -- Printer goes here
