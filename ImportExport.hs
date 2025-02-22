@@ -8,14 +8,16 @@ import JavaScript.Web.XMLHttpRequest
 import Data.Aeson
 import GHCJS.Marshal
 import qualified Control.Exception as Exc
-
+import qualified Parse.Parser as Parser
+import qualified Parse.Printer as Print
+import Editor(Document)
 
 cleanup :: IO a -> IO (Maybe a)
 cleanup x = Exc.catch (Just <$> x) handler
   where
     handler exc = return Nothing  `const`  (exc :: Exc.ErrorCall)
 
-import_ :: (FromJSON a) => JSString -> IO (Either JSString a)
+import_ :: JSString -> IO (Either JSString Document)
 import_ url = do
   response <- xhr $ Request GET url Nothing [] False NoData
   case status response of
@@ -23,19 +25,19 @@ import_ url = do
       case contents response of
         Nothing -> pure $ Left "empty response"
         Just s  -> do
-          s' <- cleanup . parse =<< toJSVal (s :: JSString)
+          s' <- cleanup . Parser.parseDoc =<< toJSVal (s :: JSString)
           pure $ case s' of
             Nothing -> Left "cannot parse file"
             Just r  -> Right r
     _ -> pure $ Left "Unsuccessful status code"
 
-export :: (ToJSON a) => JSString -> a -> IO ()
-export fn m = stringify m >>= saveAs fn
+export :: JSString -> Document -> IO ()
+export fn m = Print.print m >>= saveAs fn
 
-openFile :: (FromJSON a) => IO (Either JSString a)
+openFile :: IO (Either JSString Document)
 openFile = do
   str <- fileOpenHelper
-  s' <- cleanup . parse =<< toJSVal (str :: JSString)
+  s' <- cleanup . Parser.parseDoc =<< toJSVal (str :: JSString)
   pure $ case s' of
     Nothing -> Left "cannot parse file"
     Just r  -> Right r

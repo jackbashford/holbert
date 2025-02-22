@@ -6,7 +6,6 @@ import Editor (runAction, EditorAction (..), Editor (..), initialEditor)
 import qualified ImportExport
 import View.Editor (viewEditor)
 
-
 foreign import javascript unsafe "$r = document.location.search.slice(1);"
   urlparameter :: IO MisoString
 
