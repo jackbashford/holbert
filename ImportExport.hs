@@ -27,7 +27,7 @@ import_ url = do
         Just s  -> do
           s' <- cleanup . Parser.parseDoc =<< toJSVal (s :: JSString)
           pure $ case s' of
-            Nothing -> Left "cannot parse file"
+            Nothing -> Left $ pack ("cannot parse file" ++ unpack s)
             Just r  -> Right r
     _ -> pure $ Left "Unsuccessful status code"
 
@@ -38,9 +38,11 @@ openFile :: IO (Either JSString Document)
 openFile = do
   str <- fileOpenHelper
   s' <- cleanup . Parser.parseDoc =<< toJSVal (str :: JSString)
-  pure $ case s' of
-    Nothing -> Left "cannot parse file"
-    Just r  -> Right r
+  case s' of
+    Nothing -> pure $ Left $ pack ("cannot parse file" ++ unpack str)
+    Just r  -> do
+      print r
+      pure $ Right r
 
 foreign import javascript interruptible
   "fileSave(new Blob([$2],{type:'application/json'}),{fileName:$1,extensions:['.holbert']}).then($c);"

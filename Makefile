@@ -5,8 +5,8 @@ all:
 	cabal build && cp -R $(STATICS) $(OUTPUT)
 newstyle:
 	cabal build && cp -R $(STATICS) $(OUTPUT_NEWSTYLE)
-server:
+server: all
 	cd $(OUTPUT) && python3 -m http.server
-server_newstyle:
+server_newstyle: newstyle
 	cd $(OUTPUT_NEWSTYLE) && python3 -m http.server
 launch: server_newstyle
