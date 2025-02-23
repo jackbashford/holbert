@@ -1,6 +1,7 @@
 {
 module Parse.Parser where
 
+import Debug.Trace(trace)
 import Data.Char(isDigit)
 import Text.Earley.Mixfix as EPM
 import qualified Miso.String as MS
@@ -22,7 +23,7 @@ import Editor(Document)
 %error { parseError }
 
 %token
-	heading     			{ Heading $$ $$ }
+	heading     			{ Heading $$ }
 	paragraph   			{ Paragraph $$ }
 	"<S>"       			{ SyntaxOpen }
 	"</S>"      			{ SyntaxClose }
@@ -46,15 +47,12 @@ Items : {- empty -}   		{ [] }
 
 Item :: { I.Item }
 Item : Heading    			{ I.Heading $1 }
->	 | Paragraph  			{ I.Paragraph $1 }
->	 | SyntaxDecl 			{ I.SyntaxDecl $1 }
->	 | Rule       			{ I.Rule $1 }
 
 Heading :: { H.Heading }
-Heading : heading { H.Heading $1 (MS.ms $2) }
+Heading : heading { H.Heading (fst $1) (MS.ms (snd $1)) }
 
 {
-data Token = Heading Int String
+data Token = Heading (Int, String)
            | Paragraph String
 		   | SyntaxOpen
 		   | SyntaxClose
@@ -68,16 +66,28 @@ data Token = Heading Int String
 		   | Comma
   deriving (Show, Eq)
 
-data LexerState = InHeading Int | InParagraph | InSyntax | InRule | Default
+data LexerState = InHeading Int String | InParagraph String | InSyntax | InRule | Default
 
 lexer :: String -> [Token]
 lexer = lexer' Default
 
 lexer' :: LexerState -> String -> [Token]
 lexer' _ [] = []
-lexer' Default ('<':'H':n:'>':cs) | isDigit n = lexer' (InHeading level) cs
+lexer' Default ('<':'H':n:'>':cs) | isDigit n = lexer' (InHeading level "") cs
+  where
+    level = read [n]
+lexer' (InHeading level s) ('<':'/':'H':n:'>':'\n':'\n':cs)
+  | isDigit n && level == level' = (Heading (level, s)) : lexer' Default cs
+  | otherwise = lexer' Default cs
+  where
+    level' = read [n]
+lexer' (InHeading level s) (c:cs) = lexer' (InHeading level (c:s)) cs
+lexer' _ _ = []
 
 parseError = undefined
 
-parseDoc = undefined
+-- parseDoc needs to use the Earley parser to parse the mixfix operators
+-- Its type is `Maybe Document` in case we want to cause a failure at any point here - the actual parsing into a Document by `parse` should never fail, failure would just produce an empty list.
+parseDoc :: String -> Maybe Document
+parseDoc inp = (trace inp) $ Just $ parse $ lexer inp
 }

@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE JavaScriptFFI #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module ImportExport where
 -- Vandelay Industries
 import Miso
@@ -24,10 +25,10 @@ import_ url = do
     200 ->
       case contents response of
         Nothing -> pure $ Left "empty response"
-        Just s  -> do
-          s' <- cleanup . {- Parser.parseDoc -} parse =<< toJSVal (s :: JSString)
+        Just (s :: JSString) -> do
+          let s' = Parser.parseDoc (unpack s)
           pure $ case s' of
-            Nothing -> Left $ pack ("cannot parse imported file" ++ unpack s)
+            Nothing -> Left $ "cannot parse imported file" <> s
             Just r  -> Right r
     _ -> pure $ Left "Unsuccessful status code"
 
@@ -48,5 +49,5 @@ foreign import javascript interruptible
   "fileSave(new Blob([$2],{type:'application/json'}),{fileName:$1,extensions:['.holbert']}).then($c);"
   saveAs :: JSString -> JSString -> IO ()
 foreign import javascript interruptible
-    "fileOpenHelper().then($c);"
-    fileOpenHelper :: IO JSString
+  "fileOpenHelper().then($c);"
+  fileOpenHelper :: IO JSString
