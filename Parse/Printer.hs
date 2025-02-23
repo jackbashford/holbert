@@ -20,8 +20,8 @@ print doc = return $ MS.intercalate "\n\n" (map printItem doc)
 
 printItem :: I.Item -> MS.MisoString
 printItem = \case
-  (I.Heading (H.Heading level body)) -> "<H" <> MS.ms level <> "> " <> body <> "</H" <> MS.ms level <> ">"
-  (I.Paragraph (PG.Paragraph body)) -> "<P> " <> MS.ms body <> "</P>"
+  (I.Heading (H.Heading level body)) -> "<H" <> MS.ms level <> ">" <> body <> "</H" <> MS.ms level <> ">"
+  (I.Paragraph (PG.Paragraph body)) -> "<P>" <> MS.ms body <> "</P>"
   (I.SyntaxDecl (SD.SyntaxDecl items)) -> "<S>\n" <> showSyntax items <> "\n</S>"
   (I.Rule {}) -> "<R></R>"
 
