@@ -25,9 +25,9 @@ import_ url = do
       case contents response of
         Nothing -> pure $ Left "empty response"
         Just s  -> do
-          s' <- cleanup . Parser.parseDoc =<< toJSVal (s :: JSString)
+          s' <- cleanup . {- Parser.parseDoc -} parse =<< toJSVal (s :: JSString)
           pure $ case s' of
-            Nothing -> Left $ pack ("cannot parse file" ++ unpack s)
+            Nothing -> Left $ pack ("cannot parse imported file" ++ unpack s)
             Just r  -> Right r
     _ -> pure $ Left "Unsuccessful status code"
 
@@ -37,9 +37,9 @@ export fn m = Print.print m >>= saveAs fn
 openFile :: IO (Either JSString Document)
 openFile = do
   str <- fileOpenHelper
-  s' <- cleanup . Parser.parseDoc =<< toJSVal (str :: JSString)
+  s' <- cleanup . {- Parser.parseDoc -} parse =<< toJSVal (str :: JSString)
   case s' of
-    Nothing -> pure $ Left $ pack ("cannot parse file" ++ unpack str)
+    Nothing -> pure $ Left $ pack ("cannot parse opened file" ++ unpack str)
     Just r  -> do
       print r
       pure $ Right r
