@@ -52,8 +52,8 @@ Item : Heading              { I.Heading $1 }
 Heading :: { H.Heading }
 Heading : heading { trace (show $1) $ H.Heading (fst $1) (MS.ms (snd $1)) }
 
-Paragraph :: { P.Paragraph }
-Paragraph : paragraph { trace (show $1) $ P.Paragraph $1 }
+Paragraph :: { PG.Paragraph }
+Paragraph : paragraph { trace (show $1) $ PG.Paragraph (MS.ms $1) }
 
 {
 data Token = Heading (Int, String)
@@ -100,8 +100,8 @@ lexer' (InParagraph s) (c:cs) = lexer' (InParagraph (c:s)) cs
 
 lexer' _ _ = []
 
-parseError :: _
-parseError = trace ("parse error!") undefined
+parseError :: [Token] -> a
+parseError tks = error $ "Parse error! Tks: " ++ show tks
 
 -- parseDoc needs to use the Earley parser to parse the mixfix operators
 -- Its type is `Maybe Document` in case we want to cause a failure at any point here - the actual parsing into a Document by `parse` should never fail, failure would just produce an empty list.
