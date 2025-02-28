@@ -13,3 +13,5 @@ server: all
 server_newstyle: newstyle
 	cd {{OUTPUT_NEWSTYLE}} && python3 -m http.server
 launch: server_newstyle
+info:
+	happy Parse/Parser.y -i
