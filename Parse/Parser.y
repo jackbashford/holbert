@@ -94,7 +94,7 @@ constructSyntaxItem prec op assoc | (Just p', Just a') <- (prec', assoc') = Just
       "no" -> Just EPM.NonAssoc
       _ -> Nothing
 
-data LexerState = InHeading Int String | InParagraph String | InSyntax | InRule | Default
+data LexerState = InHeading Int String | InParagraph String | InSyntax | InRule String | Default
 
 lexer :: String -> [Token]
 lexer = lexer' Default
@@ -129,9 +129,9 @@ lexer' InSyntax cs = (SyntaxToken s) : lexer' InSyntax (dropWhile (== '\n') cs')
     (s, cs') = span (/= '\n') cs
 
 -- Rules
-lexer' Default cs | Just cs' <- stripPrefix "<R>" cs = lexer' InRule cs'
-lexer' InRule cs | Just cs' <- stripPrefix "</R>" cs = lexer' Default cs'
-lexer' InRule (c:cs) = lexer' InRule cs
+lexer' Default cs | Just cs' <- stripPrefix "<R>" cs = RuleOpen : lexer' (InRule "") cs'
+lexer' (InRule s) cs | Just cs' <- stripPrefix "</R>" cs = (Paragraph (reverse s)) : RuleClose : (lexer' Default cs')
+lexer' (InRule s) (c:cs) = lexer' (InRule (c:s)) cs
 
 lexer' _ cs = trace cs $ [Paragraph cs]
 

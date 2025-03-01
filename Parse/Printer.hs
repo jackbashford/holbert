@@ -23,7 +23,7 @@ printItem = \case
   (I.Heading (H.Heading level body)) -> "<H" <> MS.ms level <> ">" <> body <> "</H" <> MS.ms level <> ">"
   (I.Paragraph (PG.Paragraph body)) -> "<P>" <> MS.ms body <> "</P>"
   (I.SyntaxDecl (SD.SyntaxDecl items)) -> "<S>\n" <> showSyntax items <> "\n</S>"
-  (I.Rule {}) -> "<R></R>"
+  (I.Rule cts) -> "<R>" <> MS.ms (show cts) <> "</R>"
 
 showSyntax :: [(Int, MS.MisoString, EPM.Associativity)] -> MS.MisoString
 showSyntax = (MS.intercalate "\n") . map showDecl
