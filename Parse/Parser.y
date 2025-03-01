@@ -49,7 +49,7 @@ Items : Items Item          { $2 : $1 }
 Item :: { I.Item }
 Item : Heading              { I.Heading $1 }
      | Paragraph            { I.Paragraph $1 }
-     | SyntaxDecl           { trace (show $1) $ I.SyntaxDecl $1 }
+     | SyntaxDecl           { I.SyntaxDecl $1 }
 
 Heading :: { H.Heading }
 Heading : heading { H.Heading (fst $1) (MS.ms (snd $1)) }
@@ -66,7 +66,7 @@ SyntaxItems : SyntaxItem               { [$1] }
 
 
 SyntaxItem :: { Maybe (Int, MS.MisoString, EPM.Associativity) }
-SyntaxItem : syntaxTok syntaxTok syntaxTok { trace ("Syntax items: " ++ show ($1, $2, $3)) $ constructSyntaxItem $1 $2 $3 }
+SyntaxItem : syntaxTok syntaxTok syntaxTok { constructSyntaxItem $1 $2 $3 }
 
 {
 data Token = Heading (Int, String)
@@ -85,8 +85,8 @@ constructSyntaxItem :: String -> String -> String -> Maybe (Int, MS.MisoString, 
 constructSyntaxItem prec op assoc | (Just p', Just a') <- (prec', assoc') = Just (p', op', a')
                                   | otherwise = Nothing
   where
-    prec' | all isDigit prec = trace "all digits" $ Just $ read prec
-          | otherwise        = trace "nope" $ Nothing
+    prec' | all isDigit prec && not (null prec) = Just $ read prec
+          | otherwise                           = Nothing
     op' = MS.ms op
     assoc' = case assoc of
       "left" -> Just EPM.LeftAssoc
@@ -133,7 +133,8 @@ lexer' Default cs | Just cs' <- stripPrefix "<R>" cs = lexer' InRule cs'
 lexer' InRule cs | Just cs' <- stripPrefix "</R>" cs = lexer' Default cs'
 lexer' InRule (c:cs) = lexer' InRule cs
 
-lexer' _ cs = trace cs $ [Paragraph cs]
+-- TODO remove
+lexer' _ cs = [Paragraph cs]
 
 parseError :: [Token] -> a
 parseError tks = error $ "Parse error! Tks: " ++ show tks
