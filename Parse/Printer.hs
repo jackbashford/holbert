@@ -29,7 +29,7 @@ showSyntax :: [(Int, MS.MisoString, EPM.Associativity)] -> MS.MisoString
 showSyntax = (MS.intercalate "\n") . map showDecl
   where
     showDecl :: (Int, MS.MisoString, EPM.Associativity) -> MS.MisoString
-    showDecl (p, s, a) = "'" <> s <> "' (precedence " <> (MS.ms p) <> ", " <> assoc' <> " associativity)"
+    showDecl (p, s, a) = (MS.ms p) <> "\n" <> s <> "\n" <> assoc'
       where
         assoc' :: MS.MisoString
         assoc' = case a of
