@@ -53,8 +53,8 @@ executable app
   --  cpp-options: -DMIXFIX
   main-is:             Main.hs
 
-test-suite spec
+executable test
   import: shared
-  type: exitcode-stdio-1.0
-  main-is: Spec.hs
-  build-tool-depends: holbert:app
+  --if flag(mixfix)
+  --  cpp-options: -DMIXFIX
+  main-is:             Spec.hs
