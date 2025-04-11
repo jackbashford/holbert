@@ -113,11 +113,13 @@ lexer' (InHeading level s) ('<':'/':'H':n:'>':'\n':'\n':cs)
   | otherwise = lexer' Default cs
   where
     level' = read [n]
+lexer' (InHeading level s) ('\\':'<':cs) = lexer' (InHeading level ('<':s)) cs
 lexer' (InHeading level s) (c:cs) = lexer' (InHeading level (c:s)) cs
 
 -- Paragraphs
 lexer' Default cs | Just cs' <- stripPrefix "<P>" cs = lexer' (InParagraph "") cs'
 lexer' (InParagraph s) cs | Just cs' <- stripPrefix "</P>" cs = (Paragraph (reverse s)) : lexer' Default cs'
+lexer' (InParagraph s) ('\\':'<':cs) = lexer' (InParagraph ('<':s)) cs
 lexer' (InParagraph s) (c:cs) = lexer' (InParagraph (c:s)) cs
 
 -- Syntax Declarations
