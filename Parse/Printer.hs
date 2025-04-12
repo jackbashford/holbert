@@ -21,12 +21,7 @@ print :: E.Document -> IO JSString
 print doc = (return . MS.fromMisoString) $ MS.intercalate "\n\n" (printHelper doc [])
 
 printHelper :: E.Document -> SR.SyntaxTable -> [MS.MisoString]
-printHelper [x] syntax = [printItem syntaxTable x]
-  where
-    syntaxTable :: SR.SyntaxTable
-    syntaxTable = case x of
-      (I.SyntaxDecl (SD.SyntaxDecl items)) -> items ++ syntax
-      _ -> syntax
+printHelper [] _ = []
 printHelper (x:xs) syntax = printItem syntaxTable x : printHelper xs syntaxTable
   where
     syntaxTable :: SR.SyntaxTable
@@ -55,21 +50,58 @@ showSyntax = (MS.intercalate "\n") . map showDecl
           NonAssoc -> "no"
 
 showRule :: SR.SyntaxTable -> R.Rule -> MS.MisoString
-showRule syntaxTable (R.R ruleKind items props) = MS.ms (show ruleKind) <> "\n" <> (MS.intercalate "\n" (map (showItem syntaxTable) items)) <> ""
+showRule syntaxTable (R.R ruleKind items props) = MS.ms (show ruleKind) <> "\n" <> MS.intercalate "\n" (map (showItem syntaxTable) items) <> "\n<PROPS>\n" <> MS.intercalate "\n" (map (showNamedProp syntaxTable) props) <> "\n</PROPS>"
 
 showItem :: SR.SyntaxTable -> R.RuleItem -> MS.MisoString
-showItem syntaxTable (R.RI ruleName prop proofState) = "<RI>\n" <> ruleName <> "\n" <> showProp Nothing syntaxTable prop <> "\n" <> showPS proofState <> "\n</RI>"
+showItem syntaxTable (R.RI ruleName prop proofState) = "<RI>\n" <> ruleName <> "\n" <> showProp' syntaxTable prop <> "\n" <> showPS syntaxTable proofState <> "\n</RI>"
+
+showNamedProp :: SR.SyntaxTable -> P.NamedProp -> MS.MisoString
+showNamedProp syntaxTable (ruleRef, p) = "Rule: " <> MS.ms (show ruleRef) <> "\n" <> (showProp' syntaxTable p)
+
+showProp' :: SR.SyntaxTable -> P.Prop -> MS.MisoString
+showProp' tbl prop = showProp [] prop tbl prop
 
 -- This needs prettyprinting
 -- We can do this by keeping a context of both the 'parent' prop and the 'current' prop, and updating a list (the P.Path) so we can use getConclusionString.
-showProp :: Maybe (P.Path, P.Prop) -> SR.SyntaxTable -> P.Prop -> MS.MisoString
-showProp Nothing syntaxTable p@(P.Forall vars assumptions result) = (MS.intercalate "," ((\x -> if null x then ["{}"] else x) (map MS.ms vars))) <> "\n" <> (MS.intercalate "\n" (map (\(i, x) -> ". " <> showProp (Just ([i], p)) syntaxTable x) (zip [0..] assumptions))) <> "\n|-" <> (trace (show p) $ P.getConclusionString syntaxTable [] p) -- showTerm syntaxTable result
+showProp :: P.Path -> P.Prop -> SR.SyntaxTable -> P.Prop -> MS.MisoString
+showProp path parent syntaxTable (P.Forall vars premises result) = (MS.intercalate "," ((\x -> if null x then ["{}"] else x) (map MS.ms vars))) <> "\n" <> MS.intercalate "\n" (map (\(i, x) -> MS.unlines $ map (\s -> ". " <> s) (MS.lines $ showProp (i : path) parent syntaxTable x)) (zip [0..] premises)) <> "\n|-" <> P.getConclusionString syntaxTable path parent
 
-showProp (Just (path, parent)) syntaxTable prop@(P.Forall vars assumptions result) = (MS.intercalate "," ((\x -> if null x then ["{}"] else x) (map MS.ms vars))) <> "\n" <> (MS.intercalate "\n" (map (\(i, x) -> ". " <> showProp (Just (i : path, parent)) syntaxTable x) (zip [0..] assumptions))) <> "\n|-" <> (trace (show (path, parent, prop)) $ P.getConclusionString syntaxTable path parent)
+-- showProp (Just (path, parent)) syntaxTable p@(P.Forall vars assumptions result) = (MS.intercalate "," ((\x -> if null x then ["{}"] else x) (map MS.ms vars))) <> "\n" <> (MS.intercalate "\n" (map (\(i, x) -> ". " <> showProp (Just (i : path, parent)) syntaxTable x) (zip [0..] assumptions))) <> "\n|-" <> P.getConclusionString syntaxTable path parent
 
-showPS :: Maybe R.ProofState -> MS.MisoString
-showPS (Just ps) = MS.ms $ show ps
-showPS (Nothing) = "Empty proof state"
+showPS :: SR.SyntaxTable -> Maybe R.ProofState -> MS.MisoString
+showPS _ (Nothing) = "Empty proof state"
+showPS tbl (Just (R.PS tree counter)) = "<PROOF>\n" <> MS.ms (showTree tbl tree) <> "\n" <> MS.ms (show counter) <> "\n</PROOF>"
 
-showTerm :: SR.SyntaxTable -> T.Term -> MS.MisoString
-showTerm syntaxTable = MS.ms . show
+showTree :: SR.SyntaxTable -> PT.ProofTree -> MS.MisoString
+showTree tbl pt@(PT.PT displayData vars premises result subtree) = "<DISPLAY>\n" <> MS.ms (show displayData) <> "\n</DISPLAY>\n<PROVING>\n" <> (trace ("Base tree: " ++ show pt) $ showProp' tbl parentProp) <> "\n</PROVING>" <> prettySubtree
+  where
+    parentProp :: P.Prop
+    parentProp = (P.Forall vars premises result)
+
+    fauxPremiseParent :: PT.ProofTree -> P.Prop
+    fauxPremiseParent (PT.PT _ goalVars goalPremises goalResult _) = P.Forall vars ((P.Forall goalVars goalPremises goalResult) : premises) result
+
+    prettySubtree :: MS.MisoString
+    -- prettySubtree = "<SUBTREE TODO>"
+    prettySubtree = case subtree of
+      Nothing -> ""
+      Just (ruleRef, subtrees) -> "\n<RULEREF>" <> MS.ms (show ruleRef) <> "</RULEREF>\n<SUBTREES>\n" <> MS.unlines (map (\x -> ". " <> x) $ MS.lines $ MS.intercalate "\n" (map (\st -> showSubtree [0] tbl (fauxPremiseParent st) st) subtrees)) <> "</SUBTREES>"
+
+showSubtree :: P.Path -> SR.SyntaxTable -> P.Prop -> PT.ProofTree -> MS.MisoString
+showSubtree path tbl fauxParent@(P.Forall pVars pPremises pResult) pt@(PT.PT displayData vars premises result subtree) = "<DISPLAY>\n" <> MS.ms (show displayData) <> "\n</DISPLAY>\n<PROVING>\n" <> (trace ("Subtree: " ++ show pt ++ "\nparent:\n" ++ show fauxParent ++ "\npath:" ++ show path) $ showProp path fauxParent tbl goalProp) <> "\n</PROVING>" <> prettySubtree
+  where
+    goalProp :: P.Prop
+    goalProp = (P.Forall vars premises result)
+    -- TODO this allows for proper printing, but is not correct because it changes the variables of the proofs
+    -- Can we change this by using a path like [0] and manually inserting the subgoal as a premise?
+
+    fauxPremiseParent :: P.Path -> PT.ProofTree -> P.Prop -> P.Prop
+    fauxPremiseParent [] (PT.PT _ goalVars goalPremises goalResult _) (P.Forall currPVars currPPremises currPResult) = P.Forall currPVars ((P.Forall goalVars goalPremises goalResult) : currPPremises) currPResult
+    fauxPremiseParent (i:ps) pt (P.Forall currPVars (toReplace : currPPremises) currPResult) = P.Forall currPVars ((fauxPremiseParent ps pt toReplace) : currPPremises) currPResult
+
+    prettySubtree :: MS.MisoString
+    -- prettySubtree = "<SUBTREE TODO>"
+    prettySubtree = case subtree of
+      Nothing -> ""
+      Just (ruleRef, subtrees) -> "\n<RULEREF>" <> MS.ms (show ruleRef) <> "\n</RULEREF>\n<SUBTREES>\n" <> MS.unlines (map (\x -> ". " <> x) $ MS.lines $ MS.intercalate "\n" (map (\(i, st) -> showSubtree (0 : path) tbl (fauxPremiseParent path st fauxParent) st) (zip [0..] subtrees))) <> "</SUBTREES>"
+
