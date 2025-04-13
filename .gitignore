@@ -4,3 +4,5 @@
 /dist-newstyle
 *.local~
 .DS_Store
+*.hi
+*.o
