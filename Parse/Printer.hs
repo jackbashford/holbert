@@ -17,8 +17,8 @@ import qualified StringRep as SR
 import Debug.Trace(trace)
 import Data.JSString(JSString, pack)
 
-print :: E.Document -> IO JSString
-print doc = (return . MS.fromMisoString) $ MS.intercalate "\n\n" (printHelper doc [])
+printDoc :: E.Document -> JSString
+printDoc doc = MS.fromMisoString $ MS.intercalate "\n\n" (printHelper doc [])
 
 printHelper :: E.Document -> SR.SyntaxTable -> [MS.MisoString]
 printHelper [] _ = []

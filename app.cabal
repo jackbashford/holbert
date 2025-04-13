@@ -37,6 +37,7 @@ common shared
     View.SyntaxDecl
     View.Rule
     View.Item
+    Parse.Lexer
     Parse.Parser
     Parse.Printer
   ghcjs-options:

@@ -33,7 +33,7 @@ import_ url = do
     _ -> pure $ Left "Unsuccessful status code"
 
 export :: JSString -> Document -> IO ()
-export fn m = Print.print m >>= saveAs fn
+export fn m = pure (Print.printDoc m) >>= saveAs fn
 
 openFile :: IO (Either JSString Document)
 openFile = do
