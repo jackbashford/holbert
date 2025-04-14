@@ -74,7 +74,7 @@ showProp path parent tbl (P.Forall vars premises result) = let propSt = printedV
     printedVars :: MS.MisoString
     printedVars
       | null vars = ""
-      | otherwise = "Forall " <> MS.intercalate ", " (map MS.ms vars) <> " "
+      | otherwise = "Forall " <> MS.intercalate ", " (map ((<> "\"") . ("\"" <>) . MS.ms) vars) <> " "
 
     printedPremises :: MS.MisoString
     printedPremises
@@ -92,10 +92,10 @@ showProp path parent tbl (P.Forall vars premises result) = let propSt = printedV
 
 showPS :: SR.SyntaxTable -> Maybe R.ProofState -> MS.MisoString
 showPS _ (Nothing) = ""
-showPS tbl (Just (R.PS tree@(PT.PT _ vars premises result _) counter)) = "<PROOF>\n" <> MS.ms (showSubtree [] tbl (P.Forall vars premises result) tree) <> "\n" <> MS.ms (show counter) <> "\n</PROOF>"
+showPS tbl (Just (R.PS tree@(PT.PT _ vars premises result _) counter)) = "<PROOF>\n" <> MS.ms (showSubtree [] tbl (P.Forall vars premises result) tree) <> MS.ms (show counter) <> "\n</PROOF>\n"
 
 showSubtree :: P.Path -> SR.SyntaxTable -> P.Prop -> PT.ProofTree -> MS.MisoString
-showSubtree path tbl fauxParent@(P.Forall pVars pPremises pResult) pt@(PT.PT displayData vars premises result subtree) = "<DISPLAY>\n" <> MS.ms (show displayData) <> "\n</DISPLAY>\n<PROVING>\n" <> showProp path fauxParent tbl goalProp <> "\n</PROVING>" <> prettySubtree <> "\n"
+showSubtree path tbl fauxParent@(P.Forall pVars pPremises pResult) pt@(PT.PT displayData vars premises result subtree) = showDisplayData displayData <> "Goal:\n" <> showProp path fauxParent tbl goalProp <> prettySubtree <> "\n"
   where
     goalProp :: P.Prop
     goalProp = (P.Forall vars premises result)
@@ -109,5 +109,9 @@ showSubtree path tbl fauxParent@(P.Forall pVars pPremises pResult) pt@(PT.PT dis
     prettySubtree :: MS.MisoString
     prettySubtree = case subtree of
       Nothing -> ""
-      Just (ruleRef, subtrees) -> "\n<RULEREF>" <> MS.ms (show ruleRef) <> "\n</RULEREF>\n<SUBTREES>\n" <> MS.unlines (map (\x -> ". " <> x) $ MS.lines $ MS.intercalate "\n" (map (\st -> showSubtree (0 : path) tbl (fauxPremiseParent path st fauxParent) st) subtrees)) <> "</SUBTREES>"
+      Just (ruleRef, subtrees) -> "\nApply: " <> MS.ms (show ruleRef) <> (if null subtrees then "" else "\n<SUBTREES>\n" <> MS.unlines (map (\x -> ". " <> x) $ MS.lines $ MS.intercalate "\n" (map (\st -> showSubtree (0 : path) tbl (fauxPremiseParent path st fauxParent) st) subtrees)) <> "</SUBTREES>")
+
+showDisplayData :: Maybe PT.ProofDisplayData -> MS.MisoString
+showDisplayData Nothing = ""
+showDisplayData (Just (PT.PDD style subtitle)) = MS.ms (show style) <> ", \"" <> subtitle <> "\"\n"
 
