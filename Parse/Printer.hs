@@ -15,7 +15,7 @@ import qualified Heading as H
 import qualified Paragraph as PG
 import qualified StringRep as SR
 import Debug.Trace(trace)
-import Data.JSString(JSString, pack)
+import Data.JSString(JSString)
 
 printDoc :: E.Document -> JSString
 printDoc doc = MS.fromMisoString $ MS.intercalate "\n\n" (printHelper doc [])
@@ -69,7 +69,7 @@ showProp' tbl prop = (showProp [] prop tbl prop) <> "\n"
 -- This needs prettyprinting
 -- We can do this by keeping a context of both the 'parent' prop and the 'current' prop, and updating a list (the P.Path) so we can use getConclusionString.
 showProp :: P.Path -> P.Prop -> SR.SyntaxTable -> P.Prop -> MS.MisoString
-showProp path parent tbl (P.Forall vars premises result) = printedVars <> printedResult <> printedPremises
+showProp path parent tbl (P.Forall vars premises _) = printedVars <> printedResult <> printedPremises
   where
     printedVars :: MS.MisoString
     printedVars
@@ -93,7 +93,7 @@ showPS _ (Nothing) = ""
 showPS tbl (Just (R.PS tree@(PT.PT _ vars premises result _) counter)) = "<PROOF>\n" <> MS.ms (showSubtree [] tbl (P.Forall vars premises result) tree) <> MS.ms (show counter) <> "\n</PROOF>\n"
 
 showSubtree :: P.Path -> SR.SyntaxTable -> P.Prop -> PT.ProofTree -> MS.MisoString
-showSubtree path tbl fauxParent@(P.Forall pVars pPremises pResult) pt@(PT.PT displayData vars premises result subtree) = showDisplayData displayData <> "<GOAL>" <> showProp path fauxParent tbl goalProp <> "</GOAL>\n" <> prettySubtree <> "\n"
+showSubtree path tbl fauxParent (PT.PT displayData vars premises result subtree) = showDisplayData displayData <> "<GOAL>" <> showProp path fauxParent tbl goalProp <> "</GOAL>\n" <> prettySubtree <> "\n"
   where
     goalProp :: P.Prop
     goalProp = (P.Forall vars premises result)
@@ -111,5 +111,5 @@ showSubtree path tbl fauxParent@(P.Forall pVars pPremises pResult) pt@(PT.PT dis
 
 showDisplayData :: Maybe PT.ProofDisplayData -> MS.MisoString
 showDisplayData Nothing = ""
-showDisplayData (Just (PT.PDD style subtitle)) = MS.ms (show style) <> ", \"" <> subtitle <> "\"\n"
+showDisplayData (Just (PT.PDD style subtitle)) = "<DISPLAY>\n  <STYLE>" <> MS.ms (show style) <> "</STYLE>\n  <SUBTITLE>" <> subtitle <> "</SUBTITLE>\n"
 
