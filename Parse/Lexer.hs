@@ -23,9 +23,29 @@ data Token = Heading (Int, String)
            | SyntaxToken String
            | RuleOpen
            | RuleClose
-           | ParenOpen
-           | ParenClose
-           | Comma
+           | Kind R.RuleType
+           | Style PT.ProofStyle
+           | Subtitle String
+           | Name String
+           | Vars [String]
+           | TermString String
+           | RuleItemOpen
+           | RuleItemClose
+           | SubtreesOpen
+           | SubtreesClose
+           | SubtreeOpen
+           | SubtreeClose
+           | PremiseOpen
+           | PremiseClose
+           | ProofOpen
+           | ProofClose
+           | GoalOpen
+           | GoalClose
+           | RuleRefOpen
+           | RuleRefClose
+           | ConclusionOpen
+           | ConclusionClose
+           | Counter Int
   deriving (Show, Eq)
 
 constructSyntaxItem :: String -> String -> String -> Maybe (Int, MS.MisoString, EPM.Associativity)
@@ -41,7 +61,32 @@ constructSyntaxItem prec op assoc | (Just p', Just a') <- (prec', assoc') = Just
       "no" -> Just EPM.NonAssoc
       _ -> Nothing
 
-data LexerState = InHeading Int String | InParagraph String | InSyntax | InRule | Default
+makeKindToken :: String -> Token
+makeKindToken "Axiom" = Kind R.Axiom
+makeKindToken "Theorem" = Kind R.Theorem
+makeKindToken "Inductive" = Kind R.Inductive
+makeKindToken _ = error "Unknown rule kind!"
+
+makeStyleToken :: String -> Token
+makeStyleToken "Tree" = Style PT.Tree
+makeStyleToken "Calc" = Style PT.Calc
+makeStyleToken "Prose" = Style PT.Prose
+makeStyleToken "Abbr" = Style PT.Abbr
+makeStyleToken _ = error "Unknown style!"
+
+data LexerState = InHeading Int String
+                | InParagraph String
+                | InSyntax
+                | InRule
+                | InVars [String]
+                | InName String
+                | InKind String
+                | InTermStr String
+                | InCounter String
+                | InStyle String
+                | InSubtitle String
+                | InProp
+                | Default
 
 lexer :: String -> [Token]
 lexer = lexer' Default
@@ -52,21 +97,21 @@ lexer' _ [] = []
 lexer' Default (c:cs) | isSpace c = lexer' Default cs
 
 -- Headings
-lexer' Default ('<':'H':n:'>':cs) | isDigit n = {- trace ("Enter heading of level: " ++ show n ++ "\n") $ -} lexer' (InHeading level "") cs
+lexer' Default ('<':'H':n:'>':cs) | isDigit n = lexer' (InHeading level "") cs
   where
     level = read [n]
 lexer' (InHeading level s) ('<':'/':'H':n:'>':cs)
-  | isDigit n && level == level' = {- trace ("Consumed heading of level: " ++ show n ++ "\n") $ -} (Heading (level, reverse s)) : lexer' Default cs
-  | otherwise = {- trace "Fail to read heading" $ -} lexer' Default cs
+  | isDigit n && level == level' = (Heading (level, reverse s)) : lexer' Default cs
+  | otherwise = lexer' Default cs
   where
     level' = read [n]
--- lexer' (InHeading level s) ('\\':'<':cs) = lexer' (InHeading level ('<':s)) cs
+lexer' (InHeading level s) ('\\':'<':cs) = lexer' (InHeading level ('<':s)) cs -- Escapes
 lexer' (InHeading level s) (c:cs) = lexer' (InHeading level (c:s)) cs
 
 -- Paragraphs
 lexer' Default cs | Just cs' <- stripPrefix "<P>" cs = lexer' (InParagraph "") cs'
 lexer' (InParagraph s) cs | Just cs' <- stripPrefix "</P>" cs = (Paragraph (reverse s)) : lexer' Default cs'
--- lexer' (InParagraph s) ('\\':'<':cs) = lexer' (InParagraph ('<':s)) cs
+lexer' (InParagraph s) ('\\':'<':cs) = lexer' (InParagraph ('<':s)) cs -- Escapes
 lexer' (InParagraph s) (c:cs) = lexer' (InParagraph (c:s)) cs
 
 -- Syntax Declarations
@@ -78,10 +123,84 @@ lexer' InSyntax cs = (SyntaxToken s) : lexer' InSyntax (dropWhile (== '\n') cs')
     (s, cs') = span (/= '\n') cs
 
 -- Rules
-lexer' Default cs | Just cs' <- stripPrefix "<R>" cs = lexer' InRule cs'
-lexer' InRule cs | Just cs' <- stripPrefix "</R>" cs = lexer' Default cs'
-lexer' InRule (c:cs) = lexer' InRule cs
+lexer' Default cs | Just cs' <- stripPrefix "<R>" cs = RuleOpen : lexer' InRule cs'
+lexer' InRule cs | Just cs' <- stripPrefix "</R>" cs = RuleClose : lexer' Default cs'
 
--- TODO remove
-lexer' _ cs = [Paragraph cs]
+-- Rule 'kinds' (rule types) TODO rename
+lexer' InRule cs | Just cs' <- stripPrefix "<KIND>" cs = lexer' (InKind "") cs'
+lexer' (InKind s) cs | Just cs' <- stripPrefix "</KIND>" cs = (makeKindToken (reverse s)) : lexer' InRule cs'
+lexer' (InKind s) (c:cs)
+  | isSpace c = lexer' (InKind s) cs
+  | otherwise = lexer' (InKind (c:s)) cs
+
+-- unparsed mixfix strings
+lexer' InRule ('`':'`':cs) = lexer' (InTermStr "") cs
+lexer' (InTermStr s) ('`':'`':cs) = TermString (reverse s) : lexer' InRule cs
+lexer' (InTermStr s) (c:cs) = lexer' (InTermStr (c:s)) cs
+
+-- Variables
+lexer' InRule cs | Just cs' <- stripPrefix "<VARS>" cs = lexer' (InVars []) cs'
+lexer' (InVars vs) cs | Just cs' <- stripPrefix "</VARS>" cs = Vars vs : lexer' InRule cs'
+lexer' (InVars vs) (c:cs) | isSpace c = lexer' (InVars vs) cs
+lexer' (InVars vs) cs = lexer' (InVars (v:vs)) cs'
+  where
+    (v, cs') = span (not . isSpace) cs
+
+-- Names of rules
+lexer' InRule cs | Just cs' <- stripPrefix "<NAME>" cs = lexer' (InName []) cs'
+lexer' (InName s) cs | Just cs' <- stripPrefix "</NAME>" cs = Name (reverse s) : lexer' InRule cs'
+lexer' (InName s) (c:cs) = lexer' (InName (c:s)) cs
+
+-- Proof styles
+lexer' InRule cs | Just cs' <- stripPrefix "<STYLE>" cs = lexer' (InStyle []) cs'
+lexer' (InStyle s) cs | Just cs' <- stripPrefix "</STYLE>" cs = (makeStyleToken (reverse s)) : lexer' InRule cs'
+lexer' (InStyle s) (c:cs) = lexer' (InStyle (c:s)) cs
+
+-- Proof subtitles
+lexer' InRule cs | Just cs' <- stripPrefix "<SUBTITLE>" cs = lexer' (InSubtitle []) cs'
+lexer' (InSubtitle s) cs | Just cs' <- stripPrefix "</SUBTITLE>" cs = Subtitle (reverse s) : lexer' InRule cs'
+lexer' (InSubtitle s) (c:cs) = lexer' (InSubtitle (c:s)) cs
+
+-- Proof counters
+lexer' InRule cs | Just cs' <- stripPrefix "<COUNTER>" cs = lexer' (InCounter []) cs'
+lexer' (InCounter s) cs | Just cs' <- stripPrefix "</COUNTER>" cs = Counter (mkCounter s) : lexer' InRule cs
+  where
+    mkCounter :: String -> Int
+    mkCounter s
+      | all isDigit s && not (null s) = read (reverse s)
+      | otherwise = error $ "Counter is not a nonempty string of digits"
+lexer' (InCounter s) (c:cs)
+  | isSpace c = lexer' (InCounter s) cs
+  | isDigit c = lexer' (InCounter (c:s)) cs
+  | otherwise = error $ "Unexpected character: " ++ [c]
+
+-- References to applied rules
+-- lexer' InRule cs | Just cs' <- stripPrefix "<RULEREF>" cs = lexer' (InRuleRef )
+
+-- Tag rules
+lexer' state cs = case res of
+  [(x, cs')] -> x : lexer' state cs'
+  _ -> case cs of
+    [] -> []
+    (_:cs') -> lexer' state cs'
+  where
+    res = [(x, cs') | (x, Just cs') <- tagToks]
+
+    tagToks :: [(Token, Maybe String)]
+    tagToks = map (fmap (flip stripPrefix cs)) [
+        (RuleItemOpen, "<RI>"),
+        (RuleItemClose, "</RI>"),
+        (SubtreesOpen, "<SUBTREES>"),
+        (SubtreesClose, "</SUBTREES>"),
+        (SubtreeOpen, "<SUBTREE>"),
+        (SubtreeClose, "</SUBTREE>"),
+        (PremiseOpen, "<PREMISE>"),
+        (PremiseClose, "</PREMISE>"),
+        (ConclusionOpen, "<CONCLUSION>"),
+        (ConclusionClose, "</CONCLUSION>"),
+        (ProofOpen, "<PROOF>"),
+        (ProofClose, "</PROOF>"),
+        (GoalOpen, "<GOAL>"),
+        (GoalClose, "</GOAL>")
+      ]
 

@@ -61,7 +61,7 @@ showItem :: SR.SyntaxTable -> R.RuleItem -> MS.MisoString
 showItem syntaxTable (R.RI ruleName prop proofState) = "<RI>\n<NAME>" <> ruleName <> "</NAME>\n" <> showProp' syntaxTable prop <> showPS syntaxTable proofState <> "</RI>"
 
 showNamedProp :: SR.SyntaxTable -> P.NamedProp -> MS.MisoString
-showNamedProp syntaxTable (ruleRef, p) = "<RULE>" <> MS.ms (show ruleRef) <> "</RULE>\n" <> (showProp' syntaxTable p)
+showNamedProp syntaxTable (ruleRef, p) = "<RULE>" <> showRuleRef ruleRef <> "</RULE>\n" <> (showProp' syntaxTable p)
 
 showProp' :: SR.SyntaxTable -> P.Prop -> MS.MisoString
 showProp' tbl prop = (showProp [] prop tbl prop) <> "\n"
@@ -74,7 +74,7 @@ showProp path parent tbl (P.Forall vars premises _) = printedVars <> printedResu
     printedVars :: MS.MisoString
     printedVars
       | null vars = ""
-      | otherwise = "<VARS>" <> MS.intercalate " " (map MS.ms vars) <> "</VARS>\n"
+      | otherwise = "<VARS>\n" <> MS.intercalate "\n" (map (("  " <>) . MS.ms) vars) <> " </VARS>\n"
 
     printedPremises :: MS.MisoString
     printedPremises
@@ -90,7 +90,7 @@ showProp path parent tbl (P.Forall vars premises _) = printedVars <> printedResu
 
 showPS :: SR.SyntaxTable -> Maybe R.ProofState -> MS.MisoString
 showPS _ (Nothing) = ""
-showPS tbl (Just (R.PS tree@(PT.PT _ vars premises result _) counter)) = "<PROOF>\n" <> MS.ms (showSubtree [] tbl (P.Forall vars premises result) tree) <> MS.ms (show counter) <> "\n</PROOF>\n"
+showPS tbl (Just (R.PS tree@(PT.PT _ vars premises result _) counter)) = "<PROOF>\n" <> MS.ms (showSubtree [] tbl (P.Forall vars premises result) tree) <> "<COUNTER>" <> MS.ms (show counter) <> "</COUNTER>" <> "\n</PROOF>\n"
 
 showSubtree :: P.Path -> SR.SyntaxTable -> P.Prop -> PT.ProofTree -> MS.MisoString
 showSubtree path tbl fauxParent (PT.PT displayData vars premises result subtree) = showDisplayData displayData <> "<GOAL>" <> showProp path fauxParent tbl goalProp <> "</GOAL>\n" <> prettySubtree <> "\n"
@@ -107,9 +107,11 @@ showSubtree path tbl fauxParent (PT.PT displayData vars premises result subtree)
     prettySubtree :: MS.MisoString
     prettySubtree = case subtree of
       Nothing -> ""
-      Just (ruleRef, subtrees) -> "\n<RULE>" <> MS.ms (show ruleRef) <> "</RULE>\n" <> (if null subtrees then "" else "\n<SUBTREES>\n" <> MS.unlines (map ("  " <>) $ MS.lines $ MS.intercalate "\n" (map (\st -> "<SUBTREE>\n" <> showSubtree (0 : path) tbl (fauxPremiseParent path st fauxParent) st <> "\n</SUBTREE>\n") subtrees)) <> "</SUBTREES>")
+      Just (ruleRef, subtrees) -> "\n<RULEREF>" <> showRuleRef ruleRef <> "</RULEREF>\n" <> (if null subtrees then "" else "\n<SUBTREES>\n" <> MS.unlines (map ("  " <>) $ MS.lines $ MS.intercalate "\n" (map (\st -> "<SUBTREE>\n" <> showSubtree (0 : path) tbl (fauxPremiseParent path st fauxParent) st <> "\n</SUBTREE>\n") subtrees)) <> "</SUBTREES>")
 
 showDisplayData :: Maybe PT.ProofDisplayData -> MS.MisoString
 showDisplayData Nothing = ""
 showDisplayData (Just (PT.PDD style subtitle)) = "<DISPLAY>\n  <STYLE>" <> MS.ms (show style) <> "</STYLE>\n  <SUBTITLE>" <> subtitle <> "</SUBTITLE>\n"
 
+showRuleRef :: P.RuleRef -> MS.MisoString
+showRuleRef = MS.ms . show
