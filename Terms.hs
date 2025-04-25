@@ -40,6 +40,7 @@ data Term = LocalVar Index
           | Ap Term Term
           | Const Name Bool
           | Lam (Masked Name) Term
+          | Unparsed String
           deriving (Show, Eq, Ord, Generic, ToJSON, FromJSON)
 
 mentioned :: Term -> [Index]  -- generlaise with these idxs

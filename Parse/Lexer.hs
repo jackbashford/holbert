@@ -15,6 +15,7 @@ import qualified Terms as T
 import qualified Rule as R
 import qualified Heading as H
 import qualified Paragraph as PG
+import qualified StringRep as SR
 
 data Token = Heading (Int, String)
            | Paragraph String
@@ -46,6 +47,22 @@ data Token = Heading (Int, String)
            | ConclusionOpen
            | ConclusionClose
            | Counter Int
+           | RRDefn String
+           | RRLocal Int
+           | RRCases (String, Int)
+           | RRInduction (String, Int)
+           | RRRefl
+           | RRTrans
+           | RRInject
+           | RRDistinctOpen
+           | RRDistinctClose
+           | RRElimOpen
+           | RRElimClose
+           | RRRewriteOpen
+           | RRRewriteClose
+           | RRFlipped
+           | RRLHS
+           | RRRHS
   deriving (Show, Eq)
 
 constructSyntaxItem :: String -> String -> String -> Maybe (Int, MS.MisoString, EPM.Associativity)
@@ -86,7 +103,14 @@ data LexerState = InHeading Int String
                 | InStyle String
                 | InSubtitle String
                 | InProp
+                | InRuleRef (Maybe PartialRuleRef)
                 | Default
+
+data PartialRuleRef = Defn String
+                    | Local String
+                    | Cases ConstructorType String (Maybe String)
+
+data ConstructorType = C | I
 
 lexer :: String -> [Token]
 lexer = lexer' Default
@@ -163,19 +187,56 @@ lexer' (InSubtitle s) (c:cs) = lexer' (InSubtitle (c:s)) cs
 
 -- Proof counters
 lexer' InRule cs | Just cs' <- stripPrefix "<COUNTER>" cs = lexer' (InCounter []) cs'
-lexer' (InCounter s) cs | Just cs' <- stripPrefix "</COUNTER>" cs = Counter (mkCounter s) : lexer' InRule cs
+lexer' (InCounter s) cs | Just cs' <- stripPrefix "</COUNTER>" cs = Counter (mkCounter s) : lexer' InRule cs'
   where
     mkCounter :: String -> Int
     mkCounter s
       | all isDigit s && not (null s) = read (reverse s)
-      | otherwise = error $ "Counter is not a nonempty string of digits"
+      | otherwise = error $ "Counter is not a valid integer"
 lexer' (InCounter s) (c:cs)
   | isSpace c = lexer' (InCounter s) cs
   | isDigit c = lexer' (InCounter (c:s)) cs
   | otherwise = error $ "Unexpected character: " ++ [c]
 
 -- References to applied rules
--- lexer' InRule cs | Just cs' <- stripPrefix "<RULEREF>" cs = lexer' (InRuleRef )
+lexer' InRule cs | Just cs' <- stripPrefix "<RULEREF>" cs = RuleRefOpen : lexer' (InRuleRef Nothing) cs'
+lexer' (InRuleRef _) cs | Just cs' <- stripPrefix "</RULEREF>" cs = RuleRefClose : lexer' InRule cs'
+
+-- Defn
+lexer' (InRuleRef Nothing) cs | Just cs' <- stripPrefix "<DEFN> `" cs = lexer' (InRuleRef (Just (Defn ""))) cs'
+lexer' (InRuleRef (Just (Defn s))) cs | Just cs' <- stripPrefix "` </DEFN>" cs = RRDefn (reverse s) : lexer' (InRuleRef Nothing) cs'
+lexer' (InRuleRef (Just (Defn s))) (c:cs) = lexer' (InRuleRef (Just (Defn (c:s)))) cs
+
+-- Local
+lexer' (InRuleRef Nothing) cs | Just cs' <- stripPrefix "<LOCAL>" cs = lexer' (InRuleRef (Just (Local ""))) cs'
+lexer' (InRuleRef (Just (Local s))) cs | Just cs' <- stripPrefix "</LOCAL>" cs = RRLocal (mkLocal s) : lexer' (InRuleRef Nothing) cs'
+  where
+    mkLocal :: String -> Int
+    mkLocal s
+      | all isDigit s && not (null s) = read (reverse s)
+      | otherwise = error $ "Local is not a valid integer"
+lexer' (InRuleRef (Just (Local s))) (c:cs) = lexer' (InRuleRef (Just (Local (c:s)))) cs
+
+-- Cases and induction
+lexer' (InRuleRef Nothing) cs | Just cs' <- stripPrefix "<CASES> `" cs = lexer' (InRuleRef (Just (Cases C "" Nothing))) cs'
+lexer' (InRuleRef (Just (Cases C s (Just num)))) cs | Just cs' <- stripPrefix "` </CASES>" cs = RRCases ((reverse s), (mkIndex num)) : lexer' (InRuleRef Nothing) cs'
+  where
+    mkIndex :: String -> Int
+    mkIndex s
+      | all isDigit s && not (null s) = read (reverse s)
+      | otherwise = error $ "Index is not a valid integer"
+    
+lexer' (InRuleRef Nothing) cs | Just cs' <- stripPrefix "<INDUCTION> `" cs = lexer' (InRuleRef (Just (Cases I "" Nothing))) cs'
+lexer' (InRuleRef (Just (Cases I s (Just num)))) cs | Just cs' <- stripPrefix "` </INDUCTION>" cs = RRInduction ((reverse s), (mkIndex num)) : lexer' (InRuleRef Nothing) cs'
+  where
+    mkIndex :: String -> Int
+    mkIndex s
+      | all isDigit s && not (null s) = read (reverse s)
+      | otherwise = error $ "Index is not a valid integer"
+
+lexer' (InRuleRef (Just (Cases t s Nothing))) cs | Just cs' <- stripPrefix "` `" cs = lexer' (InRuleRef (Just (Cases t s (Just "")))) cs'
+lexer' (InRuleRef (Just (Cases t s Nothing))) (c:cs) = lexer' (InRuleRef (Just (Cases t (c:s) Nothing))) cs
+lexer' (InRuleRef (Just (Cases t s (Just s')))) (c:cs) = lexer' (InRuleRef (Just (Cases t s (Just (c:s'))))) cs
 
 -- Tag rules
 lexer' state cs = case res of
@@ -201,6 +262,18 @@ lexer' state cs = case res of
         (ProofOpen, "<PROOF>"),
         (ProofClose, "</PROOF>"),
         (GoalOpen, "<GOAL>"),
-        (GoalClose, "</GOAL>")
+        (GoalClose, "</GOAL>"),
+        (RRRefl, "<REFL />"),
+        (RRTrans, "<TRANS />"),
+        (RRInject, "<INJECT />"),
+        (RRDistinctOpen, "<DISTINCT>"),
+        (RRDistinctClose, "</DISTINCT>"),
+        (RRElimOpen, "<ELIM>"),
+        (RRElimClose, "</ELIM>"),
+        (RRRewriteOpen, "<REWRITE>"),
+        (RRRewriteClose, "</REWRITE>"),
+        (RRFlipped, "<FLIPPED />"),
+        (RRLHS, "<LHS />"),
+        (RRRHS, "<RHS />")
       ]
 
