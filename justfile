@@ -17,6 +17,10 @@ server_newstyle: newstyle
 launch: server_newstyle
 info:
 	happy Parse/Parser.y -i
+debug: cleanup
+	happy -a -d -i Parse/Parser.y
+	cabal build app && cp -R {{STATICS}} {{OUTPUT}}
+	cd {{OUTPUT}} && python3 -m http.server
 cleanup:
 	[ ! -e Parse/Parser.hs ] || rm Parse/Parser.hs
 	[ ! -e Parse/Parser.info ] || rm Parse/Parser.info
