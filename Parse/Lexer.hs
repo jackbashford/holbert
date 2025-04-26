@@ -164,7 +164,7 @@ lexer' (InTermStr s) (c:cs) = lexer' (InTermStr (c:s)) cs
 
 -- Variables
 lexer' InRule cs | Just cs' <- stripPrefix "<VARS>" cs = lexer' (InVars []) cs'
-lexer' (InVars vs) cs | Just cs' <- stripPrefix "</VARS>" cs = Vars vs : lexer' InRule cs'
+lexer' (InVars vs) cs | Just cs' <- stripPrefix "</VARS>" cs = Vars (reverse vs) : lexer' InRule cs'
 lexer' (InVars vs) (c:cs) | isSpace c = lexer' (InVars vs) cs
 lexer' (InVars vs) cs = lexer' (InVars (v:vs)) cs'
   where

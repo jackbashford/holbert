@@ -35,7 +35,6 @@ printItem syntaxTable = \case
   (I.Paragraph (PG.Paragraph body)) -> "<P>" <> MS.ms body <> "</P>"
   (I.SyntaxDecl (SD.SyntaxDecl items)) -> "<S>\n" <> showSyntax items <> "\n</S>"
   (I.Rule cts) -> "<R>\n" <> showRule syntaxTable cts <> "\n</R>"
-  -- (I.Rule cts) -> "<R>" <> MS.ms (show cts) <> "</R>"
 
 showSyntax :: SR.SyntaxTable -> MS.MisoString
 showSyntax = (MS.intercalate "\n") . map showDecl
@@ -66,8 +65,6 @@ showNamedProp syntaxTable (ruleRef, p) = "<RULEREF>" <> showRuleRef ruleRef <> "
 showProp' :: SR.SyntaxTable -> P.Prop -> MS.MisoString
 showProp' tbl prop = (showProp [] prop tbl prop) <> "\n"
 
--- This needs prettyprinting
--- We can do this by keeping a context of both the 'parent' prop and the 'current' prop, and updating a list (the P.Path) so we can use getConclusionString.
 showProp :: P.Path -> P.Prop -> SR.SyntaxTable -> P.Prop -> MS.MisoString
 showProp path parent tbl (P.Forall vars premises _) = printedVars <> printedResult <> printedPremises
   where

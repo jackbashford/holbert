@@ -237,7 +237,7 @@ parseRuleItem :: SR.SyntaxTable -> R.RuleItem -> R.RuleItem
 parseRuleItem sds (R.RI name prop st) = R.RI name (parseProp sds [] prop) ((parseProofState sds) <$> st)
 
 parseProp :: SR.SyntaxTable -> [T.Name] -> P.Prop -> P.Prop
-parseProp sds vsUpper (P.Forall vs ps (T.Unparsed conc)) = P.Forall vs (map (parseProp sds (vs ++ vsUpper)) ps) (parseTerm sds (vs ++ vsUpper) conc)
+parseProp sds vsUpper (P.Forall vs ps (T.Unparsed conc)) = P.Forall vs (map (parseProp sds ((reverse vs) ++ vsUpper)) ps) (parseTerm sds ((reverse vs) ++ vsUpper) conc)
 
 parseTerm :: SR.SyntaxTable -> [T.Name] -> String -> T.Term
 parseTerm sds vs str = case (SR.parse sds vs (MS.ms str)) of
@@ -248,9 +248,9 @@ parseProofState :: SR.SyntaxTable -> R.ProofState -> R.ProofState
 parseProofState sds (R.PS tree counter) = R.PS (parseProofTree sds [] tree) counter
 
 parseProofTree :: SR.SyntaxTable -> [T.Name] -> PT.ProofTree -> PT.ProofTree
-parseProofTree sds vsUpper (PT.PT display vs ps (T.Unparsed term) subs) = PT.PT display vs (map (parseProp sds (vs ++ vsUpper)) ps) (parseTerm sds (vs ++ vsUpper) term) (parsedSubtrees)
+parseProofTree sds vsUpper (PT.PT display vs ps (T.Unparsed term) subs) = PT.PT display vs (map (parseProp sds ((reverse vs) ++ vsUpper)) ps) (parseTerm sds ((reverse vs) ++ vsUpper) term) (parsedSubtrees)
   where
 	parsedSubtrees = case subs of
 	  Nothing -> Nothing
-	  Just (rr, subs) -> Just (rr, map (parseProofTree sds (vs ++ vsUpper)) subs)
+	  Just (rr, subs) -> Just (rr, map (parseProofTree sds ((reverse vs) ++ vsUpper)) subs)
 }
