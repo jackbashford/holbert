@@ -205,15 +205,15 @@ conclusion (P.Forall _ _ c) = c
 type ContextState = State (SR.SyntaxTable, [[T.Name]])
 
 insertDecls :: [Maybe (Int, MS.MisoString, EPM.Associativity)] -> ContextState SD.SyntaxDecl
-insertDecls decls = (modify (\(s, v) -> (s ++ toInsert, v))) >>= (\s -> return (SD.SyntaxDecl toInsert)) 
+insertDecls decls = modify (\(s, v) -> (s ++ toInsert, v)) *> (return (SD.SyntaxDecl toInsert)) 
   where
     toInsert = reverse (catMaybes decls)
 
 insertVars :: [T.Name] -> ContextState [T.Name]
-insertVars vs = (modify (\(s, v) -> (s, (reverse vs) : v))) >>= (\s -> return vs)
+insertVars vs = modify (\(s, v) -> (s, (reverse vs) : v)) *> (return vs)
 
 removeVars :: a -> ContextState a
-removeVars val = (modify (\(s, (v:vs)) -> (s, vs))) >>= (\s -> return val)
+removeVars val = modify (fmap tail) *> (return val)
 
 buildProp :: [T.Name] -> String -> [P.Prop] -> ContextState P.Prop
 buildProp = buildProp' True
@@ -223,7 +223,7 @@ buildProofProp = buildProp' False
 
 -- isRealProp is False when this is a 'Prop' we have constructed as part of our ProofTree.
 buildProp' :: Bool -> [T.Name] -> String -> [P.Prop] -> ContextState P.Prop
-buildProp' isRealProp vars result premises = (modify act) >>= (\_ -> get) >>= (return . mkProp)
+buildProp' isRealProp vars result premises = modify act >> mkProp <$> get
   where
     act :: (SR.SyntaxTable, [[T.Name]]) -> (SR.SyntaxTable, [[T.Name]])
     act s | not isRealProp = s
