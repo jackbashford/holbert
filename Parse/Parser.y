@@ -27,6 +27,7 @@ import Control.Monad.State
 %name parse
 %tokentype { Token }
 %error { parseError }
+%monad { State (SR.SyntaxTable, [[T.Name]]) } { (>>=) } { pure }
 
 %token
 	heading     			{ Heading $$ }
@@ -98,7 +99,7 @@ Paragraph :: { PG.Paragraph }
 Paragraph : paragraph { PG.Paragraph (MS.ms $1) }
 
 SyntaxDecl :: { SD.SyntaxDecl }
-SyntaxDecl : "<S>" SyntaxItems "</S>" { (SD.SyntaxDecl . reverse . catMaybes) $2 }
+SyntaxDecl : "<S>" SyntaxItems "</S>" {% insertDecls $2 }
 
 SyntaxItems :: { [Maybe (Int, MS.MisoString, EPM.Associativity)] }
 SyntaxItems : SyntaxItem               { [$1] }
@@ -119,14 +120,20 @@ RuleItem : "<RI>" name Prop	"</RI>"				{ R.RI (MS.ms $2) $3 Nothing }
          | "<RI>" name Prop ProofState "</RI>"	{ R.RI (MS.ms $2) $3 (Just $4) }
 
 Prop :: { P.Prop }
-Prop : Vars Conclusion Premises { P.Forall $1 (reverse $3) (T.Unparsed $2) }
+Prop : Vars Conclusion Premises {% buildProp $1 $2 $3 }
+
+ProofProp :: { P.Prop }
+ProofProp : Vars Conclusion Premises {% buildProofProp $1 $2 $3 }
 
 ProofState :: { R.ProofState }
-ProofState : "<PROOF>" Tree counter "</PROOF>" { R.PS $2 $3 } -- TODO
+ProofState : "<PROOF>" Tree counter "</PROOF>" { R.PS $2 $3 }
 
 Tree :: { PT.ProofTree }
-Tree : DisplayData "<GOAL>" Prop "</GOAL>" { PT.PT $1 (vars $3) (premises $3) (conclusion $3) Nothing }
-     | DisplayData "<GOAL>" Prop "</GOAL>" "<RULEREF>" RuleRef "</RULEREF>" Subtrees { PT.PT $1 (vars $3) (premises $3) (conclusion $3) (Just ($6, $8)) }
+Tree : DisplayData "<GOAL>" ProofProp "</GOAL>" OptionalSubtrees {% removeVars (PT.PT $1 (vars $3) (premises $3) (conclusion $3) $5) }
+
+OptionalSubtrees :: { Maybe (P.RuleRef, [PT.ProofTree]) }
+OptionalSubtrees : {- empty -} { Nothing }
+                 | "<RULEREF>" RuleRef "</RULEREF>" Subtrees { Just ($2, $4) }
 
 Subtrees :: { [PT.ProofTree] }
 Subtrees : {- empty -} { [] }
@@ -165,8 +172,8 @@ CalcLocation : "<LHS />" 		{ Just P.LHS }
 			 | {- empty -} 		{ Nothing }
 
 Vars :: { [T.Name] }
-Vars : {- empty -} { [] }
-     | vars		   { map MS.ms $1 }
+Vars : {- empty -} {% insertVars [] }
+     | vars		   {% insertVars (map MS.ms $1) }
 
 Premises :: { [P.Prop] }
 Premises : {- empty -} { [] }
@@ -175,6 +182,7 @@ Premises : {- empty -} { [] }
 Premise :: { P.Prop }
 Premise : "<PREMISE>" Prop "</PREMISE>" { $2 }
 
+Conclusion :: { String }
 Conclusion : "<CONCLUSION>" termString "</CONCLUSION>" { $2 }
 
 NamedProps :: { [P.NamedProp] }
@@ -194,63 +202,51 @@ premises (P.Forall _ ps _) = ps
 conclusion :: P.Prop -> T.Term
 conclusion (P.Forall _ _ c) = c
 
-{-
-type RuleState = ([[T.Name]], [SD.SyntaxDecl])
+type ContextState = State (SR.SyntaxTable, [[T.Name]])
 
-pushVars :: [T.Name] -> State RuleState ()
-pushVars v = State $ \(vs, tbl) -> ((), (v:vs, tbl))
+insertDecls :: [Maybe (Int, MS.MisoString, EPM.Associativity)] -> ContextState SD.SyntaxDecl
+insertDecls decls = (modify (\(s, v) -> (s ++ toInsert, v))) >>= (\s -> return (SD.SyntaxDecl toInsert)) 
+  where
+    toInsert = reverse (catMaybes decls)
 
-popVars :: State RuleState ()
-popVars = State $ \(vs, tbl) -> case vs of
-  [] -> ((), [])
-  (v:vs') -> ((), vs')
+insertVars :: [T.Name] -> ContextState [T.Name]
+insertVars vs = (modify (\(s, v) -> (s, (reverse vs) : v))) >>= (\s -> return vs)
 
--- Should never need to pop decls, we can't un-declare syntax :)
-pushDecl :: SD.SyntaxDecl -> State RuleState ()
-pushDecl decl = State $ \(vs, tbl) -> ((), (vs, decl : tbl))
+removeVars :: a -> ContextState a
+removeVars val = (modify (\(s, (v:vs)) -> (s, vs))) >>= (\s -> return val)
 
-getCts :: State RuleState RuleState
-getCts = State $ \(vs, tbl) -> ((vs, tbl), (vs, tbl))
--}
+buildProp :: [T.Name] -> String -> [P.Prop] -> ContextState P.Prop
+buildProp = buildProp' True
+
+buildProofProp :: [T.Name] -> String -> [P.Prop] -> ContextState P.Prop
+buildProofProp = buildProp' False
+
+-- isRealProp is False when this is a 'Prop' we have constructed as part of our ProofTree.
+buildProp' :: Bool -> [T.Name] -> String -> [P.Prop] -> ContextState P.Prop
+buildProp' isRealProp vars result premises = (modify act) >>= (\_ -> get) >>= (return . mkProp)
+  where
+    act :: (SR.SyntaxTable, [[T.Name]]) -> (SR.SyntaxTable, [[T.Name]])
+    act s | not isRealProp = s
+    act (s, (v:vs)) | (reverse v) == vars = (s, vs)
+    act _ = error "Non-matching variable scopes found!"
+
+    mkProp :: (SR.SyntaxTable, [[T.Name]]) -> P.Prop
+    mkProp (s, vs) = P.Forall vars (reverse premises) (parseTerm s (correctedVars vs) result)
+
+    correctedVars :: [[T.Name]] -> [T.Name]
+    correctedVars v
+      | isRealProp = (reverse vars) ++ concat v
+      | otherwise  = concat v
+
 parseError :: [Token] -> a
 parseError tks = error $ "Parse error! Tks: " ++ show tks
 
--- parseDoc needs to use the Earley parser to parse the mixfix operators
--- Its type is `Maybe Document` in case we want to cause a failure at any point here - the actual parsing into a Document by `parse` should never fail, failure should just produce an empty list.
 parseDoc :: String -> Maybe Document
-parseDoc inp = let ts = lexer inp in (trace $ "toks: " ++ show (unlines (map show ts))) $ Just $ parseMixfix $ parse $ lexer inp
+parseDoc inp = let res = evalState (parse (lexer inp)) ([], []) in if null res then Nothing else Just res
 
-parseMixfix :: Document -> Document
-parseMixfix = go []
-  where
-    go _ [] = []
-    go sds (i:is) = case i of
-      I.Paragraph _ -> i : (go sds is)
-      I.Heading _ -> i : (go sds is)
-      I.SyntaxDecl (SD.SyntaxDecl s) -> i : (go (sds ++ s) is)
-      I.Rule r -> I.Rule (parseRule r sds) : (go sds is)
-
-parseRule :: R.Rule -> SR.SyntaxTable -> R.Rule
-parseRule (R.R t is ps) sds = R.R t (map (parseRuleItem sds) is) (map (\p -> fmap (parseProp sds []) p) ps)
-
-parseRuleItem :: SR.SyntaxTable -> R.RuleItem -> R.RuleItem
-parseRuleItem sds (R.RI name prop st) = R.RI name (parseProp sds [] prop) ((parseProofState sds) <$> st)
-
-parseProp :: SR.SyntaxTable -> [T.Name] -> P.Prop -> P.Prop
-parseProp sds vsUpper (P.Forall vs ps (T.Unparsed conc)) = P.Forall vs (map (parseProp sds ((reverse vs) ++ vsUpper)) ps) (parseTerm sds ((reverse vs) ++ vsUpper) conc)
-
+-- Use the Earley parser to parse the terms
 parseTerm :: SR.SyntaxTable -> [T.Name] -> String -> T.Term
 parseTerm sds vs str = case (SR.parse sds vs (MS.ms str)) of
   Left s -> error  $ "Failure to parse mixfix operator: " ++ show s
   Right t -> t
-
-parseProofState :: SR.SyntaxTable -> R.ProofState -> R.ProofState
-parseProofState sds (R.PS tree counter) = R.PS (parseProofTree sds [] tree) counter
-
-parseProofTree :: SR.SyntaxTable -> [T.Name] -> PT.ProofTree -> PT.ProofTree
-parseProofTree sds vsUpper (PT.PT display vs ps (T.Unparsed term) subs) = PT.PT display vs (map (parseProp sds ((reverse vs) ++ vsUpper)) ps) (parseTerm sds ((reverse vs) ++ vsUpper) term) (parsedSubtrees)
-  where
-	parsedSubtrees = case subs of
-	  Nothing -> Nothing
-	  Just (rr, subs) -> Just (rr, map (parseProofTree sds ((reverse vs) ++ vsUpper)) subs)
 }

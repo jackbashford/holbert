@@ -38,12 +38,9 @@ export fn m = pure (Print.printDoc m) >>= saveAs fn
 openFile :: IO (Either JSString Document)
 openFile = do
   str <- fileOpenHelper
-  let s' = Parser.parseDoc $ unpack (str :: JSString)
-  case s' of
+  case (Parser.parseDoc $ unpack (str :: JSString)) of
     Nothing -> pure $ Left $ pack ("cannot parse opened file" ++ unpack str)
-    Just r  -> do
-      print r
-      pure $ Right r
+    Just r -> pure $ Right r
 
 foreign import javascript interruptible
   "fileSave(new Blob([$2],{type:'application/json'}),{fileName:$1,extensions:['.holbert']}).then($c);"

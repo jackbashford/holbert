@@ -47,7 +47,7 @@ constructParserTest doc = case Parser.parseDoc (MS.fromMisoString (Printer.print
   Nothing -> False
   Just d'
     | d' == doc -> True
-    | otherwise -> trace (show d' ++ "-----------------------------------" ++ show doc) $ False
+    | otherwise -> trace (show d') False
 
 indexDocument :: Document
 indexDocument = [Heading (H.Heading 0 "Holbert: Reading, Writing and Proving in the Browser"),
