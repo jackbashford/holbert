@@ -30,52 +30,54 @@ import Control.Monad.State
 %monad { State (SR.SyntaxTable, [[T.Name]]) } { (>>=) } { pure }
 
 %token
-	heading     			{ Heading $$ }
-	paragraph   			{ Paragraph $$ }
-    syntaxTok               { SyntaxToken $$ }
-	kind					{ Kind $$ }
-	name					{ Name $$ }
-	style					{ Style $$ }
-	subtitle				{ Subtitle $$ }
-	vars					{ Vars $$ }
-	termString				{ TermString $$ }
-	counter					{ Counter $$ }
-    defn      				{ RRDefn $$ }
-    local      				{ RRLocal $$ }
-    cases      				{ RRCases $$ }
-    induction      			{ RRInduction $$ }
-	"<S>"       			{ SyntaxOpen }
-	"</S>"      			{ SyntaxClose }
-	"<R>"       			{ RuleOpen }
-	"</R>"      			{ RuleClose }
-	"<RI>"          		{ RuleItemOpen }
-	"</RI>"         		{ RuleItemClose }
-	"<SUBTREES>"    		{ SubtreesOpen }
-	"</SUBTREES>"   		{ SubtreesClose }
-	"<SUBTREE>"     		{ SubtreeOpen }
-	"</SUBTREE>"    		{ SubtreeClose }
-	"<PREMISE>"     		{ PremiseOpen }
-	"</PREMISE>"    		{ PremiseClose }
-	"<CONCLUSION>"  		{ ConclusionOpen }
-	"</CONCLUSION>" 		{ ConclusionClose }
-	"<PROOF>"       		{ ProofOpen }
-	"</PROOF>"      		{ ProofClose }
-	"<GOAL>"        		{ GoalOpen }
-	"</GOAL>"       		{ GoalClose }
-	"<RULEREF>"				{ RuleRefOpen }
-	"</RULEREF>" 			{ RuleRefClose }
-    "<REFL />"	    		{ RRRefl }
-    "<TRANS />"	    		{ RRTrans }
-    "<INJECT />"			{ RRInject }
-    "<DISTINCT>"			{ RRDistinctOpen }
-    "</DISTINCT>"			{ RRDistinctClose }
-    "<ELIM>"	    		{ RRElimOpen }
-    "</ELIM>"	    		{ RRElimClose }
-    "<REWRITE>"	    		{ RRRewriteOpen }
-    "</REWRITE>"			{ RRRewriteClose }
-    "<FLIPPED />"			{ RRFlipped }
-    "<LHS />"	    		{ RRLHS }
-    "<RHS />"	    		{ RRRHS }
+    heading         { Heading $$ }
+    paragraph       { Paragraph $$ }
+    syntaxTok       { SyntaxToken $$ }
+    kind            { Kind $$ }
+    name            { Name $$ }
+    style           { Style $$ }
+    subtitle        { Subtitle $$ }
+    vars            { Vars $$ }
+    termString      { TermString $$ }
+    counter         { Counter $$ }
+    defn            { RRDefn $$ }
+    local           { RRLocal $$ }
+    cases           { RRCases $$ }
+    induction       { RRInduction $$ }
+    "<S>"           { SyntaxOpen }
+    "</S>"          { SyntaxClose }
+    "<R>"           { RuleOpen }
+    "</R>"          { RuleClose }
+    "<RI>"          { RuleItemOpen }
+    "</RI>"         { RuleItemClose }
+    "<SUBTREES>"    { SubtreesOpen }
+    "</SUBTREES>"   { SubtreesClose }
+    "<SUBTREE>"     { SubtreeOpen }
+    "</SUBTREE>"    { SubtreeClose }
+    "<PREMISE>"     { PremiseOpen }
+    "</PREMISE>"    { PremiseClose }
+    "<CONCLUSION>"  { ConclusionOpen }
+    "</CONCLUSION>" { ConclusionClose }
+    "<PROOF>"       { ProofOpen }
+    "</PROOF>"      { ProofClose }
+    "<DISPLAY>"     { DisplayOpen }
+    "</DISPLAY>"    { DisplayClose }
+    "<GOAL>"        { GoalOpen }
+    "</GOAL>"       { GoalClose }
+    "<RULEREF>"     { RuleRefOpen }
+    "</RULEREF>"    { RuleRefClose }
+    "<REFL />"      { RRRefl }
+    "<TRANS />"     { RRTrans }
+    "<INJECT />"    { RRInject }
+    "<DISTINCT>"    { RRDistinctOpen }
+    "</DISTINCT>"   { RRDistinctClose }
+    "<ELIM>"        { RRElimOpen }
+    "</ELIM>"       { RRElimClose }
+    "<REWRITE>"     { RRRewriteOpen }
+    "</REWRITE>"    { RRRewriteClose }
+    "<FLIPPED />"   { RRFlipped }
+    "<LHS />"       { RRLHS }
+    "<RHS />"       { RRRHS }
 
 %%
 
@@ -90,7 +92,7 @@ Item :: { I.Item }
 Item : Heading              { I.Heading $1 }
      | Paragraph            { I.Paragraph $1 }
      | SyntaxDecl           { I.SyntaxDecl $1 }
-	 | Rule					{ I.Rule $1 }
+     | Rule                 { I.Rule $1 }
 
 Heading :: { H.Heading }
 Heading : heading { H.Heading (fst $1) (MS.ms (snd $1)) }
@@ -112,12 +114,12 @@ Rule :: { R.Rule }
 Rule : "<R>" kind RuleItems NamedProps "</R>" { R.R $2 (reverse $3) (reverse $4) }
 
 RuleItems :: { [R.RuleItem] }
-RuleItems : {- empty -} { [] }
+RuleItems : {- empty -}        { [] }
           | RuleItems RuleItem { $2 : $1 }
 
 RuleItem :: { R.RuleItem }
-RuleItem : "<RI>" name Prop	"</RI>"				{ R.RI (MS.ms $2) $3 Nothing }
-         | "<RI>" name Prop ProofState "</RI>"	{ R.RI (MS.ms $2) $3 (Just $4) }
+RuleItem : "<RI>" name Prop "</RI>"               { R.RI (MS.ms $2) $3 Nothing }
+         | "<RI>" name Prop ProofState "</RI>"    { R.RI (MS.ms $2) $3 (Just $4) }
 
 Prop :: { P.Prop }
 Prop : Vars Conclusion Premises {% buildProp $1 $2 $3 }
@@ -132,7 +134,7 @@ Tree :: { PT.ProofTree }
 Tree : DisplayData "<GOAL>" ProofProp "</GOAL>" OptionalSubtrees {% removeVars (PT.PT $1 (vars $3) (premises $3) (conclusion $3) $5) }
 
 OptionalSubtrees :: { Maybe (P.RuleRef, [PT.ProofTree]) }
-OptionalSubtrees : {- empty -} { Nothing }
+OptionalSubtrees : {- empty -}                               { Nothing }
                  | "<RULEREF>" RuleRef "</RULEREF>" Subtrees { Just ($2, $4) }
 
 Subtrees :: { [PT.ProofTree] }
@@ -140,44 +142,44 @@ Subtrees : {- empty -} { [] }
          | "<SUBTREES>" SubtreeSeq "</SUBTREES>" { reverse $2 }
 
 SubtreeSeq :: { [PT.ProofTree] }
-SubtreeSeq : SubtreeSeq Subtree { $2 : $1 }
-           | {- empty -} 		{ [] }
+SubtreeSeq : {- empty -}        { [] }
+           | SubtreeSeq Subtree { $2 : $1 }
 
 Subtree :: { PT.ProofTree }
 Subtree : "<SUBTREE>" Tree "</SUBTREE>" { $2 }
 
 DisplayData :: { Maybe PT.ProofDisplayData }
-DisplayData : style subtitle	{ Just (PT.PDD $1 (MS.ms $2)) }
-            | {- empty -} 		{ Nothing }
+DisplayData : {- empty -}                             { Nothing }
+            | "<DISPLAY>" style subtitle "</DISPLAY>" { Just (PT.PDD $2 (MS.ms $3)) }
 
 RuleRef :: { P.RuleRef }
-RuleRef : defn 														{ P.Defn (MS.ms $1) }
-        | local 													{ P.Local $1 }
-		| cases 													{ P.Cases (MS.ms (fst $1)) (snd $1) }
-		| induction 												{ P.Induction (MS.ms (fst $1)) (snd $1) }
-		| "<REFL />" 												{ P.Refl }
-		| "<TRANS />" 												{ P.Transitivity }
-		| "<DISTINCT>" RuleRef "</DISTINCT>" 						{ P.Distinctness $2 }
-		| "<INJECT />" 												{ P.Injectivity }
-		| "<REWRITE>" RuleRef Flipped CalcLocation "</REWRITE>" 	{ P.Rewrite $2 $3 $4 }
-		| "<ELIM>" RuleRef RuleRef "</ELIM>" 						{ P.Elim $2 $3 }
+RuleRef : defn                                                      { P.Defn (MS.ms $1) }
+        | local                                                     { P.Local $1 }
+        | cases                                                     { P.Cases (MS.ms (fst $1)) (snd $1) }
+        | induction                                                 { P.Induction (MS.ms (fst $1)) (snd $1) }
+        | "<REFL />"                                                { P.Refl }
+        | "<TRANS />"                                               { P.Transitivity }
+        | "<DISTINCT>" RuleRef "</DISTINCT>"                        { P.Distinctness $2 }
+        | "<INJECT />"                                              { P.Injectivity }
+        | "<REWRITE>" RuleRef Flipped CalcLocation "</REWRITE>"     { P.Rewrite $2 $3 $4 }
+        | "<ELIM>" RuleRef RuleRef "</ELIM>"                        { P.Elim $2 $3 }
 
 Flipped :: { Bool }
-Flipped : "<FLIPPED />" 	{ True }
-        | {- empty -} 		{ False }
+Flipped : {- empty -}       { False }
+        | "<FLIPPED />"     { True }
 
 CalcLocation :: { (Maybe P.CalcLocation) }
-CalcLocation : "<LHS />" 		{ Just P.LHS }
-             | "<RHS />" 		{ Just P.RHS }
-			 | {- empty -} 		{ Nothing }
+CalcLocation : {- empty -}   { Nothing }
+             | "<LHS />"     { Just P.LHS }
+             | "<RHS />"     { Just P.RHS }
 
 Vars :: { [T.Name] }
 Vars : {- empty -} {% insertVars [] }
-     | vars		   {% insertVars (map MS.ms $1) }
+     | vars        {% insertVars (map MS.ms $1) }
 
 Premises :: { [P.Prop] }
-Premises : {- empty -} { [] }
-		 | Premises Premise { $2 : $1 }
+Premises : {- empty -}      { [] }
+         | Premises Premise { $2 : $1 }
 
 Premise :: { P.Prop }
 Premise : "<PREMISE>" Prop "</PREMISE>" { $2 }
@@ -186,7 +188,7 @@ Conclusion :: { String }
 Conclusion : "<CONCLUSION>" termString "</CONCLUSION>" { $2 }
 
 NamedProps :: { [P.NamedProp] }
-NamedProps : {- empty -} { [] }
+NamedProps : {- empty -}          { [] }
            | NamedProps NamedProp { $2 : $1 }
 
 NamedProp :: { P.NamedProp }

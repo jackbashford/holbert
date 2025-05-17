@@ -40,6 +40,8 @@ data Token = Heading (Int, String)
            | PremiseClose
            | ProofOpen
            | ProofClose
+           | DisplayOpen
+           | DisplayClose
            | GoalOpen
            | GoalClose
            | RuleRefOpen
@@ -261,6 +263,8 @@ lexer' state cs = case res of
         (ConclusionClose, "</CONCLUSION>"),
         (ProofOpen, "<PROOF>"),
         (ProofClose, "</PROOF>"),
+        (DisplayOpen, "<DISPLAY>"),
+        (DisplayClose, "</DISPLAY"),
         (GoalOpen, "<GOAL>"),
         (GoalClose, "</GOAL>"),
         (RRRefl, "<REFL />"),

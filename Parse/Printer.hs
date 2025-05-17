@@ -108,7 +108,7 @@ showSubtree path tbl fauxParent (PT.PT displayData vars premises result subtree)
 
 showDisplayData :: Maybe PT.ProofDisplayData -> MS.MisoString
 showDisplayData Nothing = ""
-showDisplayData (Just (PT.PDD style subtitle)) = "<DISPLAY>\n  <STYLE>" <> MS.ms (show style) <> "</STYLE>\n  <SUBTITLE>" <> subtitle <> "</SUBTITLE>\n"
+showDisplayData (Just (PT.PDD style subtitle)) = "<DISPLAY>\n  <STYLE>" <> MS.ms (show style) <> "</STYLE>\n  <SUBTITLE>" <> subtitle <> "</SUBTITLE>\n</DISPLAY>"
 
 showRuleRef :: P.RuleRef -> MS.MisoString
 showRuleRef rr = case rr of
