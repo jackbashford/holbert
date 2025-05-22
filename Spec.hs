@@ -37,10 +37,22 @@ tests = [
   ("Sanity check", 1 + 1 == 2),
   ("Simple paragraph", t [Paragraph (PG.Paragraph "Simple paragraph test")]),
   ("Simple heading", t [Heading (H.Heading 3 "Simple heading at level 3"), Heading (H.Heading 1 "Simple heading at level 1")]),
-  ("Index Holbert file", t indexDocument)
+
+  -- These tests should be uncommented and embellished once parsing with tolerance is added to the project (currently throw errors)
+  -- ("Unclosed heading", readTest "<P>Paragraph beforehand</P> <H1>Unclosed heading, uh-oh <P>Paragraph afterwards</P>"),
+  -- ("Unclosed at end-of-file", readTest "<H1>Unclosed heading, uh oh"),
+  
+  ("Index Holbert file", t indexDocument) -- the most comprehensive test by far, and doesn't have to be handwritten :D
   ]
   where
     t = constructParserTest
+
+readTest :: String -> Bool
+readTest inp = case Parser.parseDoc inp of
+  Nothing -> False
+  -- Currently, we check document equality, but this is not going to be possible to achieve in all cases of error recovery.
+  -- Maybe we just take the test as passing if we don't craah?
+  Just d -> MS.fromMisoString (Printer.printDoc d) == inp
 
 constructParserTest :: Document -> Bool
 constructParserTest doc = case Parser.parseDoc (MS.fromMisoString (Printer.printDoc doc)) of
