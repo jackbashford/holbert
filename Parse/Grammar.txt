@@ -1,7 +1,0 @@
-Document ::= ($Heading$ | $Paragraph$ | $SyntaxDecl$ | $Rule$)+
-Heading ::= <Hn>$String$</Hn>
-Paragraph ::= <P>$String$</P>
-SyntaxDecl ::= <S>$Int$\n$String$\n(left | right | no)</S>
-Rule ::= TODO
-String ::= .*
-Int ::= [0-9]+

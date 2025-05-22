@@ -250,7 +250,7 @@ lexer' state cs = case res of
     res = [(x, cs') | (x, Just cs') <- tagToks]
 
     tagToks :: [(Token, Maybe String)]
-    tagToks = map (fmap (flip stripPrefix cs)) [
+    tagToks = ((flip stripPrefix cs) <$>) <$> [
         (RuleItemOpen, "<RI>"),
         (RuleItemClose, "</RI>"),
         (SubtreesOpen, "<SUBTREES>"),
